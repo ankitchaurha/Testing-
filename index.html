@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voice add-to-stock test</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--card:#f4f4f2;--bd:#d8d8d4;--ac:#0f6e56;--on:#fff;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#161616;--fg:#eee;--mut:#999;--card:#222;--bd:#3a3a3a;--ac:#4fc3a1;--on:#000;--bad:#ff8a80}}
+*{box-sizing:border-box}body{margin:auto;padding:14px;font:15px system-ui,sans-serif;background:var(--bg);color:var(--fg);max-width:760px}
+h1{font-size:18px;margin:0 0 10px}h2{font-size:12px;margin:18px 0 6px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px}
+.methods{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.m{padding:8px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px}
+.m.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}
+input{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit;margin-top:8px}
+button{padding:13px;border:0;border-radius:10px;background:var(--ac);color:var(--on);font:600 16px system-ui;width:100%;cursor:pointer;margin:10px 0}
+button.rec{background:var(--bad);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px 4px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+.wrap{overflow-x:auto}small{color:var(--mut)}
+</style></head><body>
+<h1>Voice add-to-stock test</h1>
+<div class="card"><div class="methods" id="meth"></div>
+<input id="key" type="password" style="display:none" oninput="keys[METHODS[cur].id]=this.value">
+<input id="typed" style="display:none" placeholder='Type e.g. "dolo 650 do patti"'></div>
+<button id="go" onclick="toggle()">🎤 Start</button>
+<div class="card">Heard: <b id="heard">—</b><div id="res" style="margin-top:6px"></div></div>
+<small>Say the same sentence on every method, e.g. "Dolo 650 two strips", "Benadryl syrup five", "Ceftriaxone injection ten".</small>
+<h2>Results by method</h2>
+<div class="wrap"><table><thead><tr><th>Method</th><th>Heard</th><th>Matched</th><th>Qty</th><th>ms</th></tr></thead><tbody id="log"></tbody></table></div>
+<h2>Stock added</h2>
+<div class="wrap"><table><tbody id="stock"></tbody></table></div>
+<script>
+const RAW=["Paracetamol 500|Tab","Paracetamol 650|Tab","Dolo 650|Tab","Crocin 500|Tab","Azithromycin 500|Tab","Amoxicillin 500|Cap","Augmentin 625|Tab","Cetirizine 10|Tab","Levocetirizine 5|Tab","Pantoprazole 40|Tab","Rabeprazole 20|Tab","Omeprazole 20|Cap","Metformin 500|Tab","Glimepiride 2|Tab","Amlodipine 5|Tab","Telmisartan 40|Tab","Atorvastatin 10|Tab","Rosuvastatin 10|Tab","Ibuprofen 400|Tab","Diclofenac 50|Tab","Aceclofenac 100|Tab","Ondansetron 4|Tab","Domperidone 10|Tab","Montelukast 10|Tab","Levofloxacin 500|Tab","Ciprofloxacin 500|Tab","Metronidazole 400|Tab","Doxycycline 100|Cap","Folic Acid 5|Tab","Thyronorm 50|Tab","Eltroxin 50|Tab","Shelcal 500|Tab","Limcee 500|Tab","Zincovit|Tab","Ecosprin 75|Tab","Sinarest|Tab","Combiflam|Tab","Allegra 120|Tab","Becosules|Cap","Pan D|Cap","Benadryl|Syp","Corex DX|Syp","Ascoril LS|Syp","Digene|Syp","Cremaffin|Syp","Calpol 250|Syp","Zincovit|Syp","Ambrodil S|Syp","Azithromycin 200|Syp","Amoxicillin 125|Syp","Ceftriaxone 1g|Inj","Pantoprazole 40|Inj","Diclofenac 75|Inj","Ondansetron 4|Inj","Dexamethasone 4|Inj","Tetanus Toxoid|Inj","Mixtard 30|Inj","Vitamin B12 1500|Inj","Gentamicin 80|Inj","Avil 2ml|Inj","Rantac 50|Inj","Normal Saline|Inj","Betadine|Oint","Soframycin|Oint","Volini|Oint","Ciplox|Drop","Otrivin|Drop","Moxifloxacin|Drop"];
+const STOCK=RAW.map(s=>{const[n,f]=s.split('|');return{name:n,form:f,qty:0}});
+const FORMS={tab:'Tab',tablet:'Tab',tablets:'Tab',goli:'Tab',syp:'Syp',syrup:'Syp',inj:'Inj',injection:'Inj',cap:'Cap',capsule:'Cap',drop:'Drop',drops:'Drop',cream:'Oint',ointment:'Oint',gel:'Oint'};
+const NUM={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twenty:20,fifty:50,hundred:100,ek:1,do:2,teen:3,char:4,chaar:4,panch:5,paanch:5,chhe:6,che:6,saat:7,sat:7,aath:8,nau:9,das:10,bees:20,pachas:50,sau:100};
+const V={'अ':'a','आ':'a','इ':'i','ई':'i','उ':'u','ऊ':'u','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऑ':'o','ा':'a','ि':'i','ी':'i','ु':'u','ू':'u','े':'e','ै':'ai','ो':'o','ौ':'au','ॉ':'o','ं':'n','ँ':'n','ः':'h'};
+const C={'क':'k','ख':'kh','ग':'g','घ':'gh','च':'ch','छ':'chh','ज':'j','झ':'jh','ट':'t','ठ':'t','ड':'d','ढ':'d','त':'t','थ':'t','द':'d','ध':'d','न':'n','प':'p','फ':'f','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'v','श':'sh','ष':'sh','स':'s','ह':'h','ण':'n'};
+function tr(s){let o='';const a=[...s];for(let i=0;i<a.length;i++){const c=a[i],n=a[i+1];if(C[c]){o+=C[c];if(n==='्')i++;else if(n&&n!==' '&&!V[n]&&n!=='़')o+='a'}else if(V[c])o+=V[c];else if(c!=='्'&&c!=='़')o+=c}return o}
+const norm=s=>tr(String(s).toLowerCase()).replace(/aa/g,'a').replace(/ee/g,'i').replace(/[^a-z0-9]+/g,' ').trim();
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+const sim=(a,b)=>1-lev(a,b)/Math.max(a.length,b.length);
+function parse(text){const all=norm(text).split(' ').filter(Boolean),w=all.filter(x=>!FORMS[x]);if(!w.length)return null;
+ const form=all.map(x=>FORMS[x]).find(Boolean);
+ const sc=STOCK.map((it,i)=>{let s=0,L=0;norm(it.name).split(' ').forEach(x=>{const num=/^\d/.test(x),wt=num?2:x.length;L+=wt;s+=wt*(num?(w.includes(x)?1:0):Math.max(...w.map(y=>sim(x,y))))});return{i,s:s/L+(form&&form===it.form?.08:0)}}).sort((a,b)=>b.s-a.s);
+ const b=sc[0],it=STOCK[b.i],sn=norm(it.name).split(' ').filter(x=>/^\d/.test(x));let q=1;
+ w.forEach(x=>{if(sn.includes(x))return;if(/^\d{1,4}$/.test(x))q=+x;else if(NUM[x])q=NUM[x]});
+ return{i:b.i,name:`${it.name} (${it.form})`,qty:q,score:Math.min(b.s,1),alt:sc.slice(1,3).map(c=>STOCK[c.i].name+' '+STOCK[c.i].form).join(', ')}}
+const METHODS=[{id:'ws-en',name:'Browser · English (India)',kind:'ws',lang:'en-IN'},{id:'ws-hi',name:'Browser · Hindi',kind:'ws',lang:'hi-IN'},{id:'ws-us',name:'Browser · English (US)',kind:'ws',lang:'en-US'},{id:'sarvam',name:'Sarvam Saaras v3',kind:'rec'},{id:'openai',name:'OpenAI transcribe',kind:'rec'},{id:'deepgram',name:'Deepgram Nova-3',kind:'rec'},{id:'text',name:'Typed text (matcher only)',kind:'text'}];
+const API={
+async sarvam(b,k){const f=new FormData();f.append('file',b,'a.webm');f.append('model','saaras:v3');f.append('mode','codemix');const r=await fetch('https://api.sarvam.ai/speech-to-text',{method:'POST',headers:{'api-subscription-key':k},body:f});const j=await r.json();if(!r.ok)throw new Error(JSON.stringify(j));return j.transcript},
+async openai(b,k){const f=new FormData();f.append('file',b,'a.webm');f.append('model','gpt-4o-mini-transcribe');f.append('prompt','Indian pharmacy items: tablets, syrup, injection, strips');const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+k},body:f});const j=await r.json();if(!r.ok)throw new Error(JSON.stringify(j));return j.text},
+async deepgram(b,k){const r=await fetch('https://api.deepgram.com/v1/listen?model=nova-3&language=multi&smart_format=true',{method:'POST',headers:{Authorization:'Token '+k,'Content-Type':b.type||'audio/webm'},body:b});const j=await r.json();if(!r.ok)throw new Error(JSON.stringify(j));return j.results.channels[0].alternatives[0].transcript}};
+const $=id=>document.getElementById(id);let cur=0,keys={},LOG=[],stopper=null,busy=false;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const setBtn=on=>{$('go').className=on?'rec':'';$('go').textContent=on?'⏹ Stop':(METHODS[cur].kind==='text'?'Match text':'🎤 Start')};
+function pick(i){if(busy)return;cur=i;const m=METHODS[i];$('key').style.display=m.kind==='rec'?'':'none';$('key').value=keys[m.id]||'';$('key').placeholder=m.name+' API key (stays in this page)';$('typed').style.display=m.kind==='text'?'':'none';setBtn(false);
+$('meth').innerHTML=METHODS.map((x,j)=>`<div class="m ${j===i?'on':''}" onclick="pick(${j})">${x.name}</div>`).join('')}
+function runWS(m){return new Promise((res,rej)=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return rej(new Error('Not supported here. Use Chrome.'));const r=new SR();r.lang=m.lang;r.interimResults=true;let t0=0,done=false;stopper=()=>r.stop();
+r.onspeechend=()=>{t0=performance.now()};r.onresult=e=>{const x=e.results[e.results.length-1];$('heard').textContent=x[0].transcript;if(x.isFinal){done=true;res({text:x[0].transcript,ms:t0?Math.round(performance.now()-t0):0})}};
+r.onerror=e=>rej(new Error(e.error));r.onend=()=>{if(!done)rej(new Error('No speech heard'))};r.start()})}
+async function runRec(m){const k=(keys[m.id]||'').trim();if(!k)throw new Error('Enter the API key first');
+const s=await navigator.mediaDevices.getUserMedia({audio:true}),mr=new MediaRecorder(s),ch=[];mr.ondataavailable=e=>ch.push(e.data);
+const stopped=new Promise(r=>mr.onstop=r);stopper=()=>mr.stop();mr.start();$('heard').textContent='Listening…';await stopped;
+s.getTracks().forEach(t=>t.stop());stopper=null;const t0=performance.now();$('heard').textContent='Transcribing…';
+const text=await API[m.id](new Blob(ch,{type:mr.mimeType}),k);return{text,ms:Math.round(performance.now()-t0)}}
+async function toggle(){if(stopper){stopper();return}if(busy)return;busy=true;const m=METHODS[cur];setBtn(true);
+try{let out;if(m.kind==='text')out={text:$('typed').value,ms:0};else if(m.kind==='ws')out=await runWS(m);else out=await runRec(m);
+$('heard').textContent=out.text||'(empty)';const p=parse(out.text),ok=!!p&&p.score>=.6;if(ok)STOCK[p.i].qty+=p.qty;LOG.unshift({m:m.name,text:out.text,ms:out.ms,p,ok});render()}
+catch(e){$('heard').textContent='⚠ '+e.message}
+stopper=null;busy=false;setBtn(false)}
+function render(){const L=LOG[0];
+$('res').innerHTML=L&&L.p?`<b>${esc(L.p.name)}</b> × ${L.p.qty} ${L.ok?'✅ added':'⚠ low confidence, not added'}<br><small>match ${Math.round(L.p.score*100)}% · next: ${esc(L.p.alt)}</small>`:'';
+$('log').innerHTML=LOG.map(l=>`<tr><td>${esc(l.m)}</td><td>${esc(l.text)}</td><td>${l.p?esc(l.p.name)+(l.ok?'':' ⚠'):'—'}</td><td>${l.p?l.p.qty:''}</td><td>${l.ms}</td></tr>`).join('');
+$('stock').innerHTML=STOCK.filter(x=>x.qty).map(x=>`<tr><td>${esc(x.name)} <small>${x.form}</small></td><td>${x.qty}</td></tr>`).join('')||'<tr><td><small>Nothing added yet</small></td></tr>'}
+pick(0);render();
+</script></body></html>
